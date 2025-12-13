@@ -1,0 +1,36 @@
+{
+  "name": "telegram-platinum-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phroosta90/telegram-platinum-bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Phroosta90/telegram-platinum-bot/issues"
+  },
+  "homepage": "https://github.com/Phroosta90/telegram-platinum-bot#readme",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.1",
+    "@types/node-telegram-bot-api": "^0.64.13",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "better-sqlite3": "^12.5.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "node-telegram-bot-api": "^0.67.0",
+    "psn-api": "^2.17.0"
+  }
+}
