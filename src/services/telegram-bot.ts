@@ -1,10 +1,12 @@
 import TelegramBot from "node-telegram-bot-api";
 import { PSNProfilesScraper } from "./psnprofiles-scraper";
 import { GameSearchResult } from "../types";
+import { DatabaseManager } from "../utils/database";
 
 export class PlatinumBot {
   private bot: TelegramBot;
   private scraper: PSNProfilesScraper;
+  private db: DatabaseManager;
   private searchCache: Map<number, {
     games: GameSearchResult[],
     currentPage: number
@@ -15,6 +17,7 @@ export class PlatinumBot {
   constructor(token: string) {
     this.bot = new TelegramBot(token, { polling: true });
     this.scraper = new PSNProfilesScraper();
+    this.db = new DatabaseManager();
   }
 
   start() {
@@ -38,6 +41,14 @@ export class PlatinumBot {
     this.bot.on('callback_query', (query) => {
       this.handleGameSelection(query);
     });
+
+    this.bot.onText(/\/recenti/, (msg) => {
+      this.handleRecents(msg);
+    });
+
+    this.bot.onText(/\/preferiti/, (msg) => {
+      this.handleFavorites(msg);
+    });
   }
 
   private handleStart(msg: TelegramBot.Message): void {
@@ -53,13 +64,13 @@ export class PlatinumBot {
 
   private handleHelp(msg: TelegramBot.Message): void {
     const helpText = `
-📚 *Comandi disponibili:*
+    📚 *Comandi disponibili:*
 
-    /platino <nome gioco> - Cerca guida platino
-    /recenti - Ultime ricerche
-    /preferiti - I tuoi giochi preferiti
-    /help - Mostra questo messaggio
-      `;
+        /platino <nome gioco> - Cerca guida platino
+        /recenti - Ultime ricerche
+        /preferiti - I tuoi giochi preferiti
+        /help - Mostra questo messaggio
+    `;
 
     this.bot.sendMessage(msg.chat.id, helpText, { parse_mode: 'Markdown' });
   }
@@ -132,6 +143,39 @@ export class PlatinumBot {
       return;
     }
 
+    if (data?.startsWith('add_fav_')) {
+      const index = parseInt(data.split('_')[2]);
+      const cache = this.searchCache.get(chatId);
+
+      if (cache && cache.games[index]) {
+        const game = cache.games[index];
+        this.db.addFavorite(chatId, game);
+
+        this.bot.answerCallbackQuery(query.id, {
+          text: '⭐ Aggiunto ai preferiti!'
+        });
+      }
+      return;
+    }
+
+    if (data?.startsWith('remove_fav')) {
+      const index = parseInt(data.split('_')[2]);
+      console.log('data', data);
+      const cache = this.searchCache.get(chatId);
+
+      if (cache && cache.games[index]) {
+        const game = cache.games[index];
+        this.db.removeFavorite(chatId, game.url);
+
+        this.bot.answerCallbackQuery(query.id, {
+          text: '🗑️ Rimosso dai preferiti!'
+        });
+
+        this.handleFavorites(query.message!);
+      }
+      return;
+    }
+
     if (data?.startsWith('game_')) {
       const index = parseInt(data.split('_')[1]);
       const cache = this.searchCache.get(chatId);
@@ -139,9 +183,23 @@ export class PlatinumBot {
       if (cache && cache.games[index]) {
         const selectedGame = cache.games[index];
 
+        this.db.saveSearch(chatId, selectedGame);
+
+        const keyboard = [[
+          {
+            text: '⭐ Aggiungi ai preferiti',
+            callback_data: `add_fav_${index}`
+          }
+        ]];
+
         this.bot.sendMessage(chatId,
           `✅ *${selectedGame.title}*\n\n🔗 ${selectedGame.url}`,
-          { parse_mode: 'Markdown' }
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          }
         );
 
         this.bot.answerCallbackQuery(query.id);
@@ -183,5 +241,64 @@ export class PlatinumBot {
     }
 
     return [...gameButtons, navButtons];
+  }
+
+  private handleRecents(msg: TelegramBot.Message) {
+    const recent = this.db.getRecentSearches(msg.chat.id, 10);
+
+    if (recent.length === 0) {
+      this.bot.sendMessage(msg.chat.id, '📭 Nessuna ricerca recente.');
+      return;
+    }
+
+    const keyboard = recent.map((game, index) => [{
+      text: `${index + 1}. ${game.title}`,
+      url: game.url
+    }]);
+
+    this.bot.sendMessage(msg.chat.id,
+      `📋 *Le tue ultime ${recent.length} ricerche:*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      }
+    );
+  }
+
+  private handleFavorites(msg: TelegramBot.Message) {
+    const favorites = this.db.getFavorites(msg.chat.id);
+
+    if (favorites.length === 0) {
+      this.bot.sendMessage(msg.chat.id, '⭐ Nessun preferito salvato.');
+      return;
+    }
+
+    const keyboard = favorites.map((game, index) => [
+      {
+        text: `${index + 1}. ${game.title}`,
+        url: game.url
+      },
+      {
+        text: '🗑️',
+        callback_data: `remove_fav_${index}`
+      }
+    ]);
+
+    this.bot.sendMessage(msg.chat.id,
+      `📋 *I tuoi preferiti ${favorites.length}:*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      }
+    );
+
+    this.searchCache.set(msg.chat.id, {
+      games: favorites,
+      currentPage: 0
+    });
   }
 }
