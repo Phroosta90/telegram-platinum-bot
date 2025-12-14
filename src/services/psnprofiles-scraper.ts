@@ -36,12 +36,19 @@ export class PSNProfilesScraper {
     try {
       await this.init();
       const searchUrl = `${this.baseUrl}/search/guides?q=${encodeURIComponent(query)}`;
+      console.log('🔍 Searching:', searchUrl);
 
       const page = await this.browser!.newPage();
-      await page.goto(searchUrl, { waitUntil: 'networkidle2'} );
+      console.log('📄 New page created');
+
+      await page.goto(searchUrl, { waitUntil: 'networkidle2' });
+      console.log('✅ Page loaded');
+
       await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('⏱️ Delay completed');
 
       const html = await page?.content();
+      console.log('📝 HTML length:', html.length);
 
       await page.close();
 
@@ -51,13 +58,14 @@ export class PSNProfilesScraper {
       $('div.guide-page-info a[href^="/guide/"]').each((index, element) => {
         const title = $(element).find('h3.ellipsis span').text().trim();
         const url = this.baseUrl + $(element).attr('href');
-        
+
         results.push({ title, url });
       });
 
+      console.log(`✅ Found ${results.length} results`);
       return results;
     } catch (error) {
-      console.error('Errore durante lo scraping:', error);
+      console.error('❌ Scraper error:', error);
       return [];
     }
   }
