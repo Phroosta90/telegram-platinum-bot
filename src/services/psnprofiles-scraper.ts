@@ -12,13 +12,15 @@ export class PSNProfilesScraper {
 
   async init() {
     if (!this.browser) {
-      console.log('🚀 Avvio browser Chromium...');
+      console.log('🚀 Avvio browser con stealth mode...');
       this.browser = await puppeteer.launch({
         headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
-          '--disable-blink-features=AutomationControlled'
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
         ]
       });
       console.log('✅ Browser pronto');
@@ -38,7 +40,7 @@ export class PSNProfilesScraper {
       const searchUrl = `${this.baseUrl}/search/guides?q=${encodeURIComponent(query)}`;
 
       const page = await this.browser!.newPage();
-      await page.goto(searchUrl, { waitUntil: 'networkidle2'} );
+      await page.goto(searchUrl, { waitUntil: 'networkidle2' });
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       const html = await page?.content();
@@ -51,7 +53,7 @@ export class PSNProfilesScraper {
       $('div.guide-page-info a[href^="/guide/"]').each((index, element) => {
         const title = $(element).find('h3.ellipsis span').text().trim();
         const url = this.baseUrl + $(element).attr('href');
-        
+
         results.push({ title, url });
       });
 
